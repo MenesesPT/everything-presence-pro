@@ -184,7 +184,7 @@ switch:
   - platform: template
     name: "Zones Upside Down Mounting"
     id: ld2450_upside_down
-    restore_mode: RESTORE_DEFAULT_ON
+    restore_mode: RESTORE_DEFAULT_OFF
     optimistic: True
     entity_category: config
     icon: "mdi:rotate-180"
@@ -947,7 +947,7 @@ uart:
 
             float p1_distance = sqrt(p1_x * p1_x + p1_y * p1_y);
             
-            if (id(inverse_mounting).state) {
+            if (!id(ld2450_upside_down).state) {
               p1_x = -p1_x;
             }
             
@@ -1074,7 +1074,7 @@ uart:
 
             float p2_distance = sqrt(p2_x * p2_x + p2_y * p2_y);
             
-            if (id(inverse_mounting).state) {
+            if (!id(ld2450_upside_down).state) {
               p2_x = -p2_x;
             }
             
@@ -1201,7 +1201,7 @@ uart:
 
             float p3_distance = sqrt(p3_x * p3_x + p3_y * p3_y);
             
-            if (id(inverse_mounting).state) {
+            if (!id(ld2450_upside_down).state) {
               p3_x = -p3_x;
             }
             
