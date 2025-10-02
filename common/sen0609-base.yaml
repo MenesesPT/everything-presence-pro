@@ -336,8 +336,12 @@ output:
 
 uart:
   - id: uart_bus_dfrobot
-    tx_pin: GPIO5
-    rx_pin: GPIO15
+    tx_pin:
+      number: GPIO5
+      ignore_strapping_warning: true
+    rx_pin:
+      number: GPIO15
+      ignore_strapping_warning: true
     rx_buffer_size: 512
     baud_rate: 9600
     debug:

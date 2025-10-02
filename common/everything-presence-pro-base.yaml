@@ -5,7 +5,7 @@
 esphome:
   project:
     name: EverythingSmartTechnology.Everything Presence Pro
-    version: "1.0.8"
+    version: "1.1.0"
   on_boot:
     - priority: 500 
       then:
@@ -109,7 +109,8 @@ ethernet:
   type: LAN8720
   mdc_pin: GPIO23
   mdio_pin: GPIO18
-  clk_mode: GPIO17_OUT
+  clk:
+    mode: GPIO17_OUT
   phy_addr: 0
   use_address: "10.5.12.170"
 
@@ -199,7 +200,9 @@ light:
   - platform: esp32_rmt_led_strip
     id: led_rgb
     rgb_order: GRB
-    pin: GPIO2
+    pin:
+      number: GPIO2
+      ignore_strapping_warning: true
     num_leds: 1
     chipset: sk6812
     name: "LED"
@@ -405,8 +408,9 @@ switch:
     name: "Relay Output"
     id: system_alarm_relay
     pin:
-      number: 12
-      inverted: FALSE
+      number: GPIO12
+      inverted: false
+      ignore_strapping_warning: true
 
 number:
   - platform: template
