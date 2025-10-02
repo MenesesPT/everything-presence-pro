@@ -30,7 +30,7 @@ switch:
       - delay: 1s
 
   - platform: template
-    name: Static Presence UART Mode
+    name: Static Presence Debug Output
     id: dfrobot_uart_presence
     entity_category: config
     disabled_by_default: true
@@ -61,7 +61,7 @@ switch:
       - switch.turn_on: dfrobot_sensor
 
   - platform: template
-    name: Static Presence UART Target Mode
+    name: Static Presence Target Output
     id: dfrobot_uart_target
     entity_category: config
     disabled_by_default: true
@@ -92,18 +92,10 @@ switch:
       - delay: 3s
       - switch.turn_on: dfrobot_sensor
 
-  - platform: template
-    name: "Static Presence Upside Down Mounting"
-    id: dfrobot_upside_down
-    restore_mode: RESTORE_DEFAULT_OFF
-    optimistic: True
-    entity_category: config
-    icon: "mdi:rotate-180"
-
 number:
   - platform: template
     id: dfrobot_min_distance
-    name: Static Detection Min Range
+    name: Static Presence Min Range
     icon: mdi:arrow-left-right
     entity_category: config
     min_value: 0
@@ -117,7 +109,7 @@ number:
 
   - platform: template
     id: dfrobot_max_distance
-    name: Static Detection Max Range
+    name: Static Presence Max Range
     icon: mdi:arrow-left-right
     entity_category: config
     min_value: 0
@@ -130,7 +122,7 @@ number:
     mode: slider
 
   - platform: template
-    name: Static Detection Trigger Range
+    name: Static Presence Trigger Range
     icon: mdi:radar
     id: dfrobot_trigger_distance
     entity_category: config
@@ -287,7 +279,7 @@ button:
           data: "resetSystem"
 
   - platform: template
-    name: Factory Reset Static Presence
+    name: Factory Reset Static Presence Sensor
     icon: mdi:cog-counterclockwise
     id: factory_reset_dfrobot
     disabled_by_default: true

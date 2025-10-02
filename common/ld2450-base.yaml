@@ -68,7 +68,7 @@ interval:
 text_sensor:
   - platform: template
     disabled_by_default: True
-    name: "Zones Sensor Firmware"
+    name: "Tracking Sensor Firmware"
     id: "ld2450_firmware"
     entity_category: diagnostic
 
@@ -99,7 +99,7 @@ button:
       - switch.turn_off: ld2450_configuration
       - delay: 1s
   - platform: template
-    name: "Reboot Zones Sensor"
+    name: "Reboot Tracking Sensor"
     id: reboot_ld2450_sensor
     disabled_by_default: True
     entity_category: config
@@ -111,7 +111,7 @@ button:
           id: uart_bus
           data: [0xFD, 0xFC, 0xFB, 0xFA, 0x02, 0x00, 0xA3, 0x00, 0x04, 0x03, 0x02, 0x01]
   - platform: template
-    name: "Factory Reset Zones Sensor"
+    name: "Factory Reset Tracking Sensor"
     id: factory_reset_ld2450_sensor
     disabled_by_default: True
     entity_category: config
@@ -130,7 +130,7 @@ button:
 
 switch:
   - platform: template
-    name: "Zones Configuration Mode"
+    name: "Tracking Configuration Mode"
     id: ld2450_configuration
     disabled_by_default: True
     internal: True
@@ -147,7 +147,7 @@ switch:
           data: [0xFD, 0xFC, 0xFB, 0xFA, 0x02, 0x00, 0xFE, 0x00, 0x04, 0x03, 0x02, 0x01]
 
   - platform: template
-    name: "Zones Bluetooth"
+    name: "LD2450 Bluetooth"
     id: ld2450_bluetooth
     optimistic: true
     disabled_by_default: True
@@ -182,7 +182,7 @@ switch:
     entity_category: config
 
   - platform: template
-    name: "Zones Upside Down Mounting"
+    name: "Upside Down Mounting"
     id: ld2450_upside_down
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: True
@@ -191,7 +191,7 @@ switch:
 
 binary_sensor:
   - platform: template
-    name: "Zones Presence"
+    name: "Tracking Presence"
     device_class: occupancy
     id: ld2450_occupancy
     filters:
@@ -240,7 +240,7 @@ binary_sensor:
 
 number:
   - platform: template
-    name: "Zones Presence Timeout"
+    name: "Tracking Presence Timeout"
     id: ld2450_off_delay
     entity_category: config
     max_value: 600
@@ -251,7 +251,7 @@ number:
     unit_of_measurement: "s"
     initial_value: 15
   - platform: template
-    name: "Zones Detection Range"
+    name: "Tracking Detection Range"
     id: ld2450_max_distance
     entity_category: config
     max_value: 600
@@ -262,7 +262,7 @@ number:
     restore_value: True
     initial_value: 600
   - platform: template
-    name: "Zones Installation Angle"
+    name: "Tracking Sensor Angle"
     id: ld2450_installation_angle
     entity_category: config
     unit_of_measurement: "º"
@@ -743,7 +743,7 @@ sensor:
 
 select:
   - platform: template
-    name: 'Zones Update Rate'
+    name: 'Tracking Update Rate'
     icon: 'mdi:speedometer'
     optimistic: true
     restore_value: true

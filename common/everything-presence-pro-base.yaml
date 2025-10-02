@@ -1,7 +1,7 @@
 esphome:
   project:
     name: EverythingSmartTechnology.Everything Presence Pro
-    version: "1.1.1"
+    version: "1.1.2"
   on_boot:
     - priority: 500 
       then:
@@ -490,4 +490,4 @@ number:
 
 button:
   - platform: restart
-    name: "Restart device"
+    name: "Restart Device"
