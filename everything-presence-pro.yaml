@@ -15,7 +15,7 @@ esp32:
 
 packages:
    pro_base: !include common/everything-presence-pro-base.yaml
-   ld2450_base: !include common/1-base.yaml
+   ld2450_base: !include common/ld2450-base.yaml
    sen0609_base: !include common/sen0609-base.yaml
 
 esphome:
