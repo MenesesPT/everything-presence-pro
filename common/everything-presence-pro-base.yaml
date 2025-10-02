@@ -1,0 +1,533 @@
+# Everything Presence Pro Base Package
+# Core functionality shared across all Pro variants
+# Includes: PIR, Environmental sensors, LED control, System features
+
+esphome:
+  on_boot:
+    - priority: 500 
+      then:
+        - delay: 200ms
+        - switch.turn_on: system_alarm_relay
+        # Initial startup sequence that showcases the LED capabilities
+        - light.turn_on:
+            id: led_rgb
+            brightness: 50%
+            red: 100%
+            green: 0%
+            blue: 0%
+            white: 0%
+            transition_length: 200ms
+        - delay: 500ms
+        - light.turn_on:
+            brightness: 50%
+            id: led_rgb
+            red: 0%
+            green: 100%
+            blue: 0%
+            white: 0%
+            transition_length: 200ms
+        - delay: 500ms
+        - light.turn_on:
+            brightness: 50%
+            id: led_rgb
+            red: 0%
+            green: 0%
+            blue: 100%
+            white: 0%
+            transition_length: 200ms
+        - delay: 500ms
+        - light.turn_on:
+            brightness: 50%
+            id: led_rgb
+            red: 100%
+            green: 100%
+            blue: 100%
+            white: 0%
+            transition_length: 200ms
+        - delay: 500ms
+        - light.turn_off: led_rgb
+        - script.execute: update_led_state
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  on_client_connected:
+    then:
+      - light.turn_on:
+          id: led_rgb
+          brightness: 60%
+          red: 0%
+          green: 100%
+          blue: 100%
+          white: 0%
+          flash_length: 1s
+      - delay: 1s
+      # Return to previous state based on LED mode
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Environmental";'
+          then:
+            - script.execute: update_environmental_led
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Manual Control";'
+          then:
+            - light.turn_off: led_rgb
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Presence";'
+          then:
+            - light.turn_off: led_rgb
+
+  on_client_disconnected:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state != "Manual Control";'
+          then:
+            - light.turn_on:
+                id: led_rgb
+                effect: "API Disconnected"
+
+http_request:
+
+update:
+  - platform: http_request
+    name: Firmware Update
+    source: https://docs.everythingsmart.io/update/everything-presence-pro/manifest.json
+
+ota:
+  - platform: esphome
+  - platform: http_request
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+  use_address: "10.5.12.170"
+
+debug:
+  update_interval: 5s
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+      entity_category: diagnostic
+    reset_reason:
+      name: "Reset Reason"
+      entity_category: diagnostic
+
+sensor:
+  - platform: shtcx
+    id: "shtc3_sensor"
+    i2c_id: bus_a
+    temperature:
+      name: Temperature
+      id: temperature_sensor
+      filters:
+        - lambda: "return x + id(env_temperature_offset).state;"
+    humidity:
+      name: Humidity
+      id: humidity_sensor
+      filters:
+        - lambda: "return x + id(env_humidity_offset).state;"
+    address: 0x70
+    update_interval: 2s
+  
+  - platform: bh1750
+    name: Illuminance
+    id: illuminance_sensor
+    i2c_id: bus_a
+    address: 0x23
+    update_interval: 2s
+    filters:
+      - lambda: "return x + id(env_illuminance_offset).state;"
+      - clamp:
+          min_value: 0
+
+i2c:
+  - id: bus_a
+    scl: GPIO32
+    sda: GPIO33
+    scan: true
+
+binary_sensor:
+  - platform: gpio
+    name: Motion
+    id: pir_motion
+    device_class: motion
+    pin:
+      number: GPIO36
+    filters:
+      - delayed_off:  !lambda 'return id(pir_off_delay).state * 1000.0;'
+
+  - platform: template
+    name: Occupancy
+    id: occupancy
+    device_class: occupancy
+    filters:
+      - delayed_off: !lambda 'return id(occupancy_off_delay).state * 1000.0;'
+    lambda: |-
+      if ( id(dfrobot_presence).state or id(pir_motion).state) {
+        return true;
+      }
+      else if (id(dfrobot_presence).state == 0 and id(pir_motion).state == 0) {
+        return false;
+      }
+      else {
+        return id(ld2450_occupancy).state;
+      }
+
+  - platform: template
+    name: mmWave Presence
+    id: mmwave_occupancy
+    device_class: occupancy
+    filters:
+      - delayed_off: !lambda 'return id(occupancy_off_delay).state * 1000.0;'
+    lambda: |-
+      return id(dfrobot_presence).state || id(ld2450_occupancy).state;
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_rgb
+    rgb_order: GRB
+    pin: GPIO2
+    num_leds: 1
+    chipset: sk6812
+    name: "LED"
+    effects:
+      - pulse:
+          name: "Pulse"
+          transition_length: 1s
+          update_interval: 1s
+      - pulse:
+          name: "Environmental Pulse"
+          transition_length: 2s
+          update_interval: 2s
+      - pulse:
+          name: "Fast Pulse"
+          transition_length: 1s
+          update_interval: 1s
+          min_brightness: 30%
+          max_brightness: 70%
+      - pulse:
+          name: "Presence Flash"
+          transition_length: 200ms
+          update_interval: 200ms
+          min_brightness: 30%
+          max_brightness: 80%
+      # Add API connection status effect
+      - strobe:
+          name: "API Disconnected"
+          colors:
+            - state: true
+              brightness: 30%
+              red: 100%
+              green: 0%
+              blue: 100%
+              white: 0%
+              duration: 500ms
+            - state: false
+              duration: 2000ms
+      - strobe:
+          name: "Fast Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              white: 0%
+              duration: 100ms
+            - state: false
+              duration: 100ms
+      - strobe:
+          name: "Security Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              white: 0%
+              duration: 500ms
+            - state: false
+              duration: 500ms
+      - pulse:
+          name: "Breathing"
+          transition_length: 1.5s
+          update_interval: 1.5s
+      - pulse:
+          name: "Security Breathing"
+          transition_length: 3s
+          update_interval: 3s
+          min_brightness: 20%
+          max_brightness: 60%
+      # Improved Presence effects with better visibility
+      - strobe:
+          name: "PIR Presence"
+          colors:
+            - state: true
+              brightness: 60%
+              red: 0%
+              green: 100%
+              blue: 0%
+              white: 0%
+              duration: 1000ms
+            - state: false
+              duration: 500ms
+      - strobe:
+          name: "mmWave Presence"
+          colors:
+            - state: true
+              brightness: 60%
+              red: 0%
+              green: 100%
+              blue: 100%
+              white: 0%
+              duration: 1000ms
+            - state: false
+              duration: 500ms
+      - strobe:
+          name: "Both Presence"
+          colors:
+            - state: true
+              brightness: 70%
+              red: 100%
+              green: 100%
+              blue: 100%
+              white: 100%
+              duration: 1000ms
+            - state: false
+              duration: 500ms
+
+select:
+  - platform: template
+    name: Relay Trigger Mode
+    id: system_alarm_mode
+    entity_category: config
+    optimistic: True
+    options:
+      - "Disabled"
+      - "Motion Only"
+      - "Presence Only"
+      - "Motion or Presence"
+    initial_option: "Disabled"
+    restore_value: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(system_alarm_mode).state == "Disabled";'
+            then:
+              - switch.turn_off: system_alarm_relay
+
+  - platform: template
+    name: "LED Mode"
+    id: led_mode_select
+    optimistic: true
+    options:
+      - "Manual Control"
+      - "Environmental"
+      - "Presence"
+    initial_option: "Manual Control"
+    restore_value: true
+    icon: mdi:led-variant
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(led_mode_select).state == "Manual Control";'
+            then:
+              - logger.log: "Setting LED to Manual Control mode"
+        
+        - if:
+            condition:
+              lambda: 'return id(led_mode_select).state == "Environmental";'
+            then:
+              - logger.log: "Setting LED to Environmental mode"
+              - script.execute: update_environmental_led
+        
+        - if:
+            condition:
+              lambda: 'return id(led_mode_select).state == "Presence";'
+            then:
+              - logger.log: "Setting LED to Presence mode"
+              - light.turn_off: led_rgb
+
+script:
+  - id: update_led_state
+    then:
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Manual Control";'
+          then:
+            - logger.log: "Setting LED to Manual Control mode"
+      
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Environmental";'
+          then:
+            - logger.log: "Setting LED to Environmental mode"
+            - script.execute: update_environmental_led
+      
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Presence";'
+          then:
+            - logger.log: "Setting LED to Presence mode"
+            - light.turn_off: led_rgb
+
+  # Keep the environmental_led script
+  - id: update_environmental_led
+    then:
+      # Simple CO2-based environmental lighting using built-in conditionals
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              below: 800
+          then:
+            # Good CO2 level - solid green (no pulse)
+            - light.turn_on:
+                id: led_rgb
+                brightness: 30%
+                red: 0%
+                green: 100%
+                blue: 0%
+                white: 0%
+                effect: none
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              above: 799
+              below: 1200
+          then:
+            # Moderate CO2 level - amber/yellow with pulse
+            - light.turn_on:
+                id: led_rgb
+                brightness: 40%
+                red: 100%
+                green: 65%
+                blue: 0%
+                white: 0%
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Environmental Pulse"
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              above: 1199
+          then:
+            # High CO2 level - red with faster pulse
+            - light.turn_on:
+                id: led_rgb
+                brightness: 50%
+                red: 100%
+                green: 0%
+                blue: 0%
+                white: 0%
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Fast Pulse"
+
+switch:
+  - platform: gpio
+    name: "Relay Output"
+    id: system_alarm_relay
+    pin:
+      number: 12
+      inverted: FALSE
+
+number:
+  - platform: template
+    name: Occupancy Timeout
+    icon: mdi:clock-end
+    entity_category: config
+    id: occupancy_off_delay
+    min_value: 1
+    max_value: 600
+    initial_value: 15
+    optimistic: true
+    step: 5
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: slider
+
+  - platform: template
+    name: Motion Timeout
+    icon: mdi:clock-end
+    entity_category: config
+    id: pir_off_delay
+    min_value: 1
+    max_value: 120
+    initial_value: 10
+    optimistic: true
+    step: 1
+    restore_value: true
+    unit_of_measurement: seconds
+    mode: slider
+
+  - platform: template
+    name: "Temperature Calibration"
+    id: env_temperature_offset
+    unit_of_measurement: "°C"
+    min_value: -20
+    max_value: 20
+    step: 0.1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    icon: "mdi:thermometer"
+    entity_category: config
+    on_value:
+      - lambda: 'id(shtc3_sensor).update();'
+
+  - platform: template
+    name: "Humidity Calibration"
+    id: env_humidity_offset
+    unit_of_measurement: "%"
+    min_value: -50
+    max_value: 50
+    step: 0.1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    icon: "mdi:water-percent"
+    entity_category: config
+    on_value:
+      - lambda: 'id(shtc3_sensor).update();'
+
+  - platform: template
+    name: "Illuminance Calibration"
+    id: env_illuminance_offset
+    unit_of_measurement: "lx"
+    min_value: -50
+    max_value: 50
+    step: 1
+    mode: box
+    update_interval: never
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    icon: "mdi:brightness-5"
+    entity_category: config
+    on_value:
+      - lambda: 'id(illuminance_sensor).update();'
+
+button:
+  - platform: restart
+    name: "Restart device"
