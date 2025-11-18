@@ -1,0 +1,88 @@
+sensor:
+  - platform: scd4x
+    i2c_id: bus_b
+    id: scd40
+    co2:
+      name: "CO2"
+      id: "co2"
+      on_value:
+        then:
+          - if:
+              condition:
+                lambda: 'return id(led_mode_select).state == "Environmental";'
+              then:
+                - script.execute: update_co2_environmental_led
+    automatic_self_calibration: false
+
+i2c:
+  - id: bus_b
+    scl: GPIO16
+    sda: GPIO4
+    scan: true
+
+button:
+  - platform: template
+    name: "Calibrate CO2"
+    id: calibrate_scd40
+    on_press:
+      - scd4x.perform_forced_calibration:
+          value: 419
+          id: scd40
+
+script:
+  # CO2-specific environmental LED script
+  - id: update_co2_environmental_led
+    then:
+      # CO2-based environmental lighting
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              below: 800
+          then:
+            # Good CO2 level - solid green (no pulse)
+            - light.turn_on:
+                id: led_rgb
+                brightness: 30%
+                red: 0%
+                green: 100%
+                blue: 0%
+                white: 0%
+                effect: none
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              above: 799
+              below: 1200
+          then:
+            # Moderate CO2 level - amber/yellow with pulse
+            - light.turn_on:
+                id: led_rgb
+                brightness: 40%
+                red: 100%
+                green: 65%
+                blue: 0%
+                white: 0%
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Environmental Pulse"
+      - if:
+          condition:
+            sensor.in_range:
+              id: co2
+              above: 1199
+          then:
+            # High CO2 level - red with faster pulse
+            - light.turn_on:
+                id: led_rgb
+                brightness: 50%
+                red: 100%
+                green: 0%
+                blue: 0%
+                white: 0%
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Fast Pulse"

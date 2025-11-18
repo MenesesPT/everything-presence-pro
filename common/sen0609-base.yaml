@@ -1,7 +1,3 @@
-# SEN0609 DFRobot mmWave Sensor Package
-# Static presence detection with high sensitivity
-# Compatible with Everything Presence Pro
-
 binary_sensor:
   - platform: gpio
     name: Static Presence

@@ -6,10 +6,6 @@ substitutions:
   uart_target_output_disabled: "true"
   uart_presence_output_disabled: "true"
   log_level: "DEBUG"
-  # Firmware variant configuration
-  firmware_network: "WiFi"
-  firmware_co2: "Enabled"
-  firmware_ble: "Disabled"
 
 esp32:
   board: esp32dev
@@ -21,107 +17,26 @@ packages:
    pro_base: !include common/everything-presence-pro-base.yaml
    ld2450_base: !include common/ld2450-base.yaml
    sen0609_base: !include common/sen0609-base.yaml
+   co2_base: !include common/co2-base.yaml
 
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: True
+  on_boot:
+    - priority: -100
+      then:
+        - lambda: |-
+            id(firmware_network).publish_state("WiFi");
+            id(firmware_co2).publish_state("Enabled");
+            id(firmware_ble).publish_state("Disabled");
 
 update:
   - platform: http_request
+    id: update_http_request
     name: Firmware Update
     source: https://docs.everythingsmart.io/update/everything-presence-pro/everything-presence-pro-wifi-co2-manifest.json
 
 wifi:
 
 improv_serial:
-
-
-sensor:
-  - platform: scd4x
-    i2c_id: bus_b
-    id: scd40
-    co2:
-      name: "CO2"
-      id: "co2"
-      on_value:
-        then:
-          - if:
-              condition:
-                lambda: 'return id(led_mode_select).state == "Environmental";'
-              then:
-                - script.execute: update_environmental_led
-    automatic_self_calibration: false
-
-i2c:
-  - id: bus_b
-    scl: GPIO16
-    sda: GPIO4
-    scan: true
-
-button:
-  - platform: template
-    name: "Calibrate CO2"
-    id: calibrate_scd40
-    on_press:
-      - scd4x.perform_forced_calibration:
-          value: 419
-          id: scd40
-
-script:
-  # Override base environmental LED script with CO2-specific logic
-  - id: update_environmental_led
-    then:
-      # CO2-based environmental lighting
-      - if:
-          condition:
-            sensor.in_range:
-              id: co2
-              below: 800
-          then:
-            # Good CO2 level - solid green (no pulse)
-            - light.turn_on:
-                id: led_rgb
-                brightness: 30%
-                red: 0%
-                green: 100%
-                blue: 0%
-                white: 0%
-                effect: none
-      - if:
-          condition:
-            sensor.in_range:
-              id: co2
-              above: 799
-              below: 1200
-          then:
-            # Moderate CO2 level - amber/yellow with pulse
-            - light.turn_on:
-                id: led_rgb
-                brightness: 40%
-                red: 100%
-                green: 65%
-                blue: 0%
-                white: 0%
-            - delay: 50ms
-            - light.turn_on:
-                id: led_rgb
-                effect: "Environmental Pulse"
-      - if:
-          condition:
-            sensor.in_range:
-              id: co2
-              above: 1199
-          then:
-            # High CO2 level - red with faster pulse
-            - light.turn_on:
-                id: led_rgb
-                brightness: 50%
-                red: 100%
-                green: 0%
-                blue: 0%
-                white: 0%
-            - delay: 50ms
-            - light.turn_on:
-                id: led_rgb
-                effect: "Fast Pulse"

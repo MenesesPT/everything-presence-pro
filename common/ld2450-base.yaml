@@ -157,7 +157,7 @@ switch:
       - delay: 2s
       - uart.write:
           id: uart_bus
-          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00, 0xA4, 0x00, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01]  # Turn on Bluetooth
+          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00, 0xA4, 0x00, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01]
       - delay: 2s
       - button.press: reboot_ld2450_sensor  # Reboot after enabling Bluetooth
       - delay: 2s
@@ -168,7 +168,7 @@ switch:
       - delay: 2s
       - uart.write:
           id: uart_bus
-          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00, 0xA4, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01]  # Turn off Bluetooth
+          data: [0xFD, 0xFC, 0xFB, 0xFA, 0x04, 0x00, 0xA4, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01]
       - delay: 2s
       - button.press: reboot_ld2450_sensor  # Reboot after enabling Bluetooth
       - delay: 2s
@@ -302,7 +302,7 @@ number:
     id: ld2450_zone1_begin_y
     entity_category: config
     max_value: 6000
-    min_value: -1560 # if epl is rotated 45deg, a target could be detected at negative values: -6000*sin(60deg-45deg) = ~-1552
+    min_value: -1560
     unit_of_measurement: "mm"
     step: 10
     optimistic: True

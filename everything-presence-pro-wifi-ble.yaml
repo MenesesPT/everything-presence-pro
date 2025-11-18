@@ -6,10 +6,6 @@ substitutions:
   uart_target_output_disabled: "true"
   uart_presence_output_disabled: "true"
   log_level: "DEBUG"
-  # Firmware variant configuration
-  firmware_network: "WiFi"
-  firmware_co2: "Disabled"
-  firmware_ble: "Enabled"
 
 esp32:
   board: esp32dev
@@ -27,9 +23,17 @@ esphome:
   name: ${name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: True
+  on_boot:
+    - priority: -100
+      then:
+        - lambda: |-
+            id(firmware_network).publish_state("WiFi");
+            id(firmware_co2).publish_state("Disabled");
+            id(firmware_ble).publish_state("Enabled");
 
 update:
   - platform: http_request
+    id: update_http_request
     name: Firmware Update
     source: https://docs.everythingsmart.io/update/everything-presence-pro/everything-presence-pro-wifi-ble-manifest.json
 

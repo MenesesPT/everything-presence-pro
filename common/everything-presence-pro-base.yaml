@@ -1,9 +1,3 @@
-substitutions:
-  # Firmware variant defaults - override in variant YAML files
-  firmware_network: "Ethernet"
-  firmware_co2: "Disabled"
-  firmware_ble: "Disabled"
-
 esphome:
   project:
     name: EverythingSmartTechnology.Everything Presence Pro
@@ -102,15 +96,6 @@ ota:
   - platform: esphome
   - platform: http_request
     id: ota_http_request
-
-ethernet:
-  type: LAN8720
-  mdc_pin: GPIO23
-  mdio_pin: GPIO18
-  clk:
-    pin: GPIO17
-    mode: CLK_OUT
-  phy_addr: 0
 
 debug:
   update_interval: 5s
@@ -294,7 +279,7 @@ light:
           update_interval: 3s
           min_brightness: 20%
           max_brightness: 60%
-      # Improved Presence effects with better visibility
+      # Presence effects
       - strobe:
           name: "PIR Presence"
           colors:
@@ -410,58 +395,49 @@ select:
               - light.turn_off: led_rgb
 
   - platform: template
-    name: "Firmware Network Type"
-    id: firmware_network_type
+    id: firmware_network
+    name: Firmware Network Type
+    icon: "mdi:network"
     entity_category: diagnostic
     optimistic: true
+    restore_value: true
     options:
       - "WiFi"
       - "Ethernet"
-    initial_option: ${firmware_network}
-    restore_value: true
-    icon: mdi:network
+    initial_option: "Ethernet"
     on_value:
       then:
-        - logger.log:
-            format: "Network type changed to: %s"
-            args: ['x.c_str()']
-        - script.execute: trigger_firmware_update
+        - script.execute: update_firmware_manifest
 
   - platform: template
-    name: "Firmware CO2 Sensor"
-    id: firmware_co2_enabled
+    id: firmware_co2
+    name: Firmware CO2 Sensor
+    icon: "mdi:molecule-co2"
     entity_category: diagnostic
     optimistic: true
+    restore_value: true
     options:
       - "Disabled"
       - "Enabled"
-    initial_option: ${firmware_co2}
-    restore_value: true
-    icon: mdi:molecule-co2
+    initial_option: "Disabled"
     on_value:
       then:
-        - logger.log:
-            format: "CO2 sensor changed to: %s"
-            args: ['x.c_str()']
-        - script.execute: trigger_firmware_update
+        - script.execute: update_firmware_manifest
 
   - platform: template
-    name: "Firmware Bluetooth Proxy"
-    id: firmware_ble_enabled
+    id: firmware_ble
+    name: Firmware Bluetooth Proxy
+    icon: "mdi:bluetooth"
     entity_category: diagnostic
     optimistic: true
+    restore_value: true
     options:
       - "Disabled"
       - "Enabled"
-    initial_option: ${firmware_ble}
-    restore_value: true
-    icon: mdi:bluetooth
+    initial_option: "Disabled"
     on_value:
       then:
-        - logger.log:
-            format: "Bluetooth proxy changed to: %s"
-            args: ['x.c_str()']
-        - script.execute: trigger_firmware_update
+        - script.execute: update_firmware_manifest
 
 script:
   - id: update_led_state
@@ -486,12 +462,8 @@ script:
             - logger.log: "Setting LED to Presence mode"
             - light.turn_off: led_rgb
 
-  # Environmental LED script - placeholder for base model
-  # CO2-specific logic is in the CO2 variant
   - id: update_environmental_led
-    mode: restart
     then:
-      # Default environmental LED state for non-CO2 models
       - light.turn_on:
           id: led_rgb
           brightness: 30%
@@ -501,44 +473,31 @@ script:
           white: 0%
           effect: none
 
-  # Firmware switching script - constructs URL and triggers OTA update
-  - id: trigger_firmware_update
+  - id: update_firmware_manifest
     then:
       - lambda: |-
-          // Build firmware URL based on selected options
+          // Build manifest URL based on selected options
           std::string base_url = "https://docs.everythingsmart.io/update/everything-presence-pro/everything-presence-pro-";
-          std::string filename = "";
 
-          // Add network type (required)
-          std::string network = id(firmware_network_type).state;
+          // Add network type (required, lowercase)
+          std::string network = id(firmware_network).state;
           std::transform(network.begin(), network.end(), network.begin(), ::tolower);
-          filename += network;
+          base_url += network;
 
-          // Add features in alphabetical order
-          std::vector<std::string> features;
-
-          if (id(firmware_ble_enabled).state == "Enabled") {
-            features.push_back("ble");
+          // Add features in alphabetical order (ble before co2)
+          if (id(firmware_ble).state == "Enabled") {
+            base_url += "-ble";
           }
 
-          if (id(firmware_co2_enabled).state == "Enabled") {
-            features.push_back("co2");
+          if (id(firmware_co2).state == "Enabled") {
+            base_url += "-co2";
           }
 
-          // Features are already in alphabetical order (ble, co2)
-          for (const auto& feature : features) {
-            filename += "-" + feature;
-          }
+          base_url += "-manifest.json";
 
-          filename += ".bin";
-          std::string full_url = base_url + filename;
-
-          ESP_LOGI("firmware_update", "Downloading firmware: %s", full_url.c_str());
-
-          // Trigger OTA update
-          auto *ota = id(ota_http_request);
-          ota->set_url(full_url.c_str());
-          ota->perform();
+          ESP_LOGI("firmware", "Switching to manifest: %s", base_url.c_str());
+          id(update_http_request).set_source_url(base_url.c_str());
+      - component.update: update_http_request
 
 switch:
   - platform: gpio
