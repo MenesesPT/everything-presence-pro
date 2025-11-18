@@ -3,7 +3,7 @@ esphome:
     name: EverythingSmartTechnology.Everything Presence Pro
     version: "1.1.2"
   on_boot:
-    - priority: 500 
+    - priority: 375
       then:
         - delay: 200ms
         - switch.turn_on: system_alarm_relay
@@ -11,10 +11,10 @@ esphome:
         - lambda: 'id(api_connected_flag) = false;'
         - light.turn_on:
             id: led_rgb
-            brightness: 25%
-            red: 100%
-            green: 80%
-            blue: 0%
+            brightness: 30%
+            red: 0%
+            green: 60%
+            blue: 100%
             white: 0%
             effect: "Network Connecting"
 
@@ -23,54 +23,59 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
 
 # Enable logging
 logger:
+  level: debug
+  logs:
+    uart: error
+    sensor: error
 
 # Enable Home Assistant API
 api:
   on_client_connected:
     then:
+      - lambda: 'id(init_in_progress) = false; id(api_connected_flag) = true;'
       - if:
           condition:
             lambda: 'return id(led_mode_select).state != "Manual Control";'
           then:
-            - lambda: 'id(api_connected_flag) = true;'
-            # Multi-color celebration, then restore mode
-            - light.turn_off: led_rgb
-            - delay: 50ms
+            # Stop any effects first
             - light.turn_on:
                 id: led_rgb
-                brightness: 70%
+                effect: none
+            # Smooth celebration sequence with flowing colors
+            - light.turn_on:
+                id: led_rgb
+                brightness: 60%
                 red: 0%
                 green: 100%
                 blue: 100%
                 white: 0%
-            - delay: 250ms
+                transition_length: 400ms
+            - delay: 400ms
             - light.turn_on:
                 id: led_rgb
-                brightness: 70%
+                brightness: 65%
                 red: 0%
-                green: 60%
+                green: 70%
                 blue: 100%
                 white: 0%
-            - delay: 250ms
+                transition_length: 350ms
+            - delay: 350ms
             - light.turn_on:
                 id: led_rgb
                 brightness: 70%
-                red: 60%
+                red: 50%
                 green: 0%
                 blue: 100%
                 white: 0%
-            - delay: 250ms
-            - light.turn_on:
-                id: led_rgb
-                brightness: 70%
-                red: 100%
-                green: 0%
-                blue: 80%
-                white: 0%
-            - delay: 250ms
+                transition_length: 350ms
+            - delay: 350ms
             - light.turn_on:
                 id: led_rgb
                 brightness: 65%
@@ -78,19 +83,15 @@ api:
                 green: 100%
                 blue: 100%
                 white: 0%
-            - delay: 350ms
-            - script.execute: update_led_state
+                transition_length: 400ms
+            - delay: 500ms
+      # Always restore to current mode, even if Manual Control
+      - script.execute: control_leds
 
   on_client_disconnected:
     then:
-      - if:
-          condition:
-            lambda: 'return id(led_mode_select).state != "Manual Control";'
-          then:
-            - lambda: 'id(api_connected_flag) = false;'
-            - light.turn_on:
-                id: led_rgb
-                effect: "API Disconnected"
+      - lambda: 'id(api_connected_flag) = false;'
+      - script.execute: control_leds
 
 http_request:
   verify_ssl: false
@@ -128,7 +129,7 @@ sensor:
       filters:
         - lambda: "return x + id(env_humidity_offset).state;"
     address: 0x70
-    update_interval: 2s
+    update_interval: 30s
   
   - platform: bh1750
     name: Illuminance
@@ -197,22 +198,9 @@ binary_sensor:
             }
         - if:
             condition:
-              lambda: 'return id(led_mode_select).state == "Presence";'
+              lambda: 'return id(led_mode_select).state == "Presence" || id(led_mode_select).state == "Environmental + Presence";'
             then:
-              - if:
-                  condition:
-                    lambda: 'return id(occupancy).state;'
-                  then:
-                    - light.turn_on:
-                        id: led_rgb
-                        brightness: 50%
-                        red: 0%
-                        green: 100%
-                        blue: 100%
-                        white: 0%
-                        effect: "Presence Glow"
-                  else:
-                    - light.turn_off: led_rgb
+              - script.execute: control_leds
 
   - platform: template
     name: mmWave Presence
@@ -234,39 +222,82 @@ light:
     chipset: sk6812
     name: "LED"
     effects:
+      # Gentle breathing effects
       - pulse:
-          name: "Pulse"
-          transition_length: 1s
-          update_interval: 1s
+          name: "Slow Breathe"
+          transition_length: 3s
+          update_interval: 3s
+          min_brightness: 5%
+          max_brightness: 50%
       - pulse:
-          name: "Environmental Pulse"
+          name: "Medium Breathe"
           transition_length: 2s
           update_interval: 2s
+          min_brightness: 10%
+          max_brightness: 60%
+      - pulse:
+          name: "Fast Breathe"
+          transition_length: 1s
+          update_interval: 1s
+          min_brightness: 15%
+          max_brightness: 70%
+
+      # Presence detection effects - subtle, calming pulse
       - pulse:
           name: "Presence Glow"
-          transition_length: 800ms
-          update_interval: 800ms
-          min_brightness: 10%
-          max_brightness: 70%
+          transition_length: 4s
+          update_interval: 4s
+          min_brightness: 40%
+          max_brightness: 55%
+      - pulse:
+          name: "Presence Active"
+          transition_length: 2.5s
+          update_interval: 2.5s
+          min_brightness: 45%
+          max_brightness: 65%
+
+      # Network status effects
       - pulse:
           name: "Network Connecting"
-          transition_length: 800ms
-          update_interval: 800ms
-          min_brightness: 35%
-          max_brightness: 75%
-      # API connection status effect
+          transition_length: 1s
+          update_interval: 1s
+          min_brightness: 20%
+          max_brightness: 60%
       - strobe:
           name: "API Disconnected"
           colors:
             - state: true
-              brightness: 15%
+              brightness: 20%
               red: 100%
               green: 0%
               blue: 100%
               white: 0%
-              duration: 400ms
+              duration: 500ms
             - state: false
-              duration: 3000ms
+              duration: 2500ms
+
+      # Environmental feedback effects
+      # Good: No effect - steady glow
+      - pulse:
+          name: "Environmental Warning"
+          transition_length: 1.5s
+          update_interval: 1.5s
+          min_brightness: 20%
+          max_brightness: 50%
+      - pulse:
+          name: "Environmental Alert"
+          transition_length: 800ms
+          update_interval: 800ms
+          min_brightness: 30%
+          max_brightness: 65%
+
+      # Smooth transition effects
+      - pulse:
+          name: "Gentle Fade"
+          transition_length: 2s
+          update_interval: 2s
+          min_brightness: 0%
+          max_brightness: 100%
 
 select:
   - platform: template
@@ -320,31 +351,13 @@ select:
       - "Manual Control"
       - "Environmental"
       - "Presence"
+      - "Environmental + Presence"
     initial_option: "Manual Control"
     restore_value: true
     icon: mdi:led-variant
     on_value:
       then:
-        - if:
-            condition:
-              lambda: 'return id(led_mode_select).state == "Manual Control";'
-            then:
-              - logger.log: "Setting LED to Manual Control mode"
-              - light.turn_off: led_rgb
-        
-        - if:
-            condition:
-              lambda: 'return id(led_mode_select).state == "Environmental";'
-            then:
-              - logger.log: "Setting LED to Environmental mode"
-              - script.execute: update_environmental_led
-        
-        - if:
-            condition:
-              lambda: 'return id(led_mode_select).state == "Presence";'
-            then:
-              - logger.log: "Setting LED to Presence mode"
-              - light.turn_off: led_rgb
+        - script.execute: control_leds
 
   - platform: template
     id: firmware_network
@@ -383,6 +396,317 @@ select:
     initial_option: "Disabled"
 
 script:
+  # Master LED control script - single source of truth for LED state
+  # Called whenever device state changes (like HA Voice approach)
+  - id: control_leds
+    mode: restart
+    then:
+      - lambda: |
+          ESP_LOGD("control_leds", "Called - init_in_progress: %d, api_connected: %d, led_mode: %s",
+                   id(init_in_progress), id(api_connected_flag), id(led_mode_select).state.c_str());
+
+          // Initialization/connection phase
+          if (id(init_in_progress)) {
+            ESP_LOGD("control_leds", "Executing control_leds_connecting (init)");
+            id(control_leds_connecting).execute();
+          }
+          // No API connection
+          else if (!id(api_connected_flag)) {
+            ESP_LOGD("control_leds", "Executing control_leds_connecting (no API)");
+            id(control_leds_connecting).execute();
+          }
+          // Manual control mode
+          else if (id(led_mode_select).state == "Manual Control") {
+            ESP_LOGD("control_leds", "Executing control_leds_manual");
+            id(control_leds_manual).execute();
+          }
+          // Environmental mode
+          else if (id(led_mode_select).state == "Environmental") {
+            ESP_LOGD("control_leds", "Executing control_leds_environmental");
+            id(control_leds_environmental).execute();
+          }
+          // Presence mode
+          else if (id(led_mode_select).state == "Presence") {
+            ESP_LOGD("control_leds", "Executing control_leds_presence");
+            id(control_leds_presence).execute();
+          }
+          // Environmental + Presence combined mode
+          else if (id(led_mode_select).state == "Environmental + Presence") {
+            ESP_LOGD("control_leds", "Executing control_leds_environmental_presence");
+            id(control_leds_environmental_presence).execute();
+          }
+
+  # Connection state - blue pulsing
+  - id: control_leds_connecting
+    then:
+      - light.turn_on:
+          id: led_rgb
+          brightness: !lambda 'return 0.30 * id(led_brightness_multiplier).state;'
+          red: 0%
+          green: 60%
+          blue: 100%
+          white: 0%
+          transition_length: 500ms
+      - delay: 550ms
+      - light.turn_on:
+          id: led_rgb
+          effect: "Network Connecting"
+
+  # Manual control - turn off
+  - id: control_leds_manual
+    then:
+      - logger.log: "control_leds_manual: Turning off LED"
+      - light.turn_on:
+          id: led_rgb
+          effect: none
+      - delay: 50ms
+      - light.turn_on:
+          id: led_rgb
+          brightness: 1%
+          transition_length: 500ms
+      - delay: 500ms
+      - light.turn_off: led_rgb
+      - logger.log: "control_leds_manual: LED turned off"
+
+  # Environmental mode
+  - id: control_leds_environmental
+    then:
+      - script.execute: update_environmental_led
+
+  # Presence mode
+  - id: control_leds_presence
+    then:
+      - if:
+          condition:
+            lambda: 'return id(occupancy).state;'
+          then:
+            # Presence detected - warm purple/magenta glow
+            - light.turn_on:
+                id: led_rgb
+                effect: none
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                brightness: !lambda 'return 0.55 * id(led_brightness_multiplier).state;'
+                red: 80%
+                green: 20%
+                blue: 100%
+                white: 0%
+                transition_length: 600ms
+            - delay: 650ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Presence Glow"
+          else:
+            # No presence - turn off
+            - light.turn_on:
+                id: led_rgb
+                brightness: 1%
+                transition_length: 500ms
+            - delay: 500ms
+            - light.turn_off: led_rgb
+
+  # Environmental + Presence combined mode
+  - id: control_leds_environmental_presence
+    then:
+      - if:
+          condition:
+            lambda: 'return id(occupancy).state;'
+          then:
+            # Presence detected - check CO2 level
+            - if:
+                condition:
+                  # CO2 is good - just show presence
+                  lambda: 'return id(co2).state < 800;'
+                then:
+                  # Good CO2 - show steady presence glow (warm purple)
+                  - light.turn_on:
+                      id: led_rgb
+                      effect: none
+                  - delay: 50ms
+                  - light.turn_on:
+                      id: led_rgb
+                      brightness: !lambda 'return 0.55 * id(led_brightness_multiplier).state;'
+                      red: 80%
+                      green: 20%
+                      blue: 100%
+                      white: 0%
+                      transition_length: 600ms
+                  - delay: 650ms
+                  - light.turn_on:
+                      id: led_rgb
+                      effect: "Presence Glow"
+                else:
+                  # CO2 is elevated (warning or alert) - alternate between presence and environmental
+                  - script.execute: alternate_presence_environmental
+          else:
+            # No presence - show environmental status only
+            - script.execute: update_environmental_led
+
+  # Alternating presence and environmental display for when both presence and elevated CO2
+  - id: alternate_presence_environmental
+    mode: restart
+    then:
+      # Show presence glow (warm purple) for 3 seconds
+      - light.turn_on:
+          id: led_rgb
+          effect: none
+      - delay: 50ms
+      - light.turn_on:
+          id: led_rgb
+          brightness: !lambda 'return 0.55 * id(led_brightness_multiplier).state;'
+          red: 80%
+          green: 20%
+          blue: 100%
+          white: 0%
+          transition_length: 600ms
+      - delay: 650ms
+      - light.turn_on:
+          id: led_rgb
+          effect: "Presence Glow"
+      - delay: 3000ms
+      # Transition to environmental status for 4 seconds
+      - if:
+          condition:
+            lambda: 'return id(co2).state >= 800 && id(co2).state < 1200;'
+          then:
+            # Warning level - amber
+            - light.turn_on:
+                id: led_rgb
+                effect: none
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                brightness: !lambda 'return 0.45 * id(led_brightness_multiplier).state;'
+                red: 100%
+                green: 65%
+                blue: 0%
+                white: 0%
+                transition_length: 600ms
+            - delay: 650ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Environmental Warning"
+      - if:
+          condition:
+            lambda: 'return id(co2).state >= 1200;'
+          then:
+            # Alert level - red
+            - light.turn_on:
+                id: led_rgb
+                effect: none
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                brightness: !lambda 'return 0.55 * id(led_brightness_multiplier).state;'
+                red: 100%
+                green: 0%
+                blue: 0%
+                white: 0%
+                transition_length: 600ms
+            - delay: 650ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Environmental Alert"
+      - delay: 4000ms
+      # Loop back by calling control_leds if still in this mode
+      - if:
+          condition:
+            lambda: 'return id(led_mode_select).state == "Environmental + Presence" && id(occupancy).state && id(co2).state >= 800;'
+          then:
+            - script.execute: alternate_presence_environmental
+
+  # DEPRECATED - kept for backwards compatibility with CO2
+  # Smooth transition helper - fades out before changing state
+  - id: led_smooth_transition
+    parameters:
+      target_brightness: float
+      target_red: float
+      target_green: float
+      target_blue: float
+      target_effect: string
+    then:
+      # Always clear effects first to prevent them from continuing
+      - light.turn_on:
+          id: led_rgb
+          effect: none
+      - if:
+          condition:
+            light.is_on: led_rgb
+          then:
+            # Fade to 50% brightness first for smooth transition
+            - light.turn_on:
+                id: led_rgb
+                brightness: !lambda 'return 0.5 * id(led_brightness_multiplier).state;'
+                transition_length: 300ms
+            - delay: 300ms
+      # Now transition to target state with brightness multiplier applied
+      - light.turn_on:
+          id: led_rgb
+          brightness: !lambda 'return target_brightness * id(led_brightness_multiplier).state;'
+          red: !lambda 'return target_red;'
+          green: !lambda 'return target_green;'
+          blue: !lambda 'return target_blue;'
+          white: 0%
+          transition_length: 600ms
+      - delay: 650ms
+      - if:
+          condition:
+            lambda: 'return target_effect != "none";'
+          then:
+            - light.turn_on:
+                id: led_rgb
+                effect: !lambda 'return target_effect;'
+
+  # Smooth fade out helper
+  - id: led_fade_out
+    then:
+      - if:
+          condition:
+            light.is_on: led_rgb
+          then:
+            - light.turn_on:
+                id: led_rgb
+                brightness: 1%
+                transition_length: 500ms
+            - delay: 500ms
+            - light.turn_off: led_rgb
+
+  # Smooth fade in helper
+  - id: led_fade_in
+    parameters:
+      brightness: float
+      red: float
+      green: float
+      blue: float
+      effect: string
+    then:
+      # Clear any running effects first
+      - light.turn_on:
+          id: led_rgb
+          effect: none
+      - light.turn_on:
+          id: led_rgb
+          brightness: 1%
+          red: !lambda 'return red;'
+          green: !lambda 'return green;'
+          blue: !lambda 'return blue;'
+          white: 0%
+          transition_length: 0s
+      - delay: 50ms
+      - light.turn_on:
+          id: led_rgb
+          brightness: !lambda 'return brightness * id(led_brightness_multiplier).state;'
+          transition_length: 700ms
+      - delay: 750ms
+      - if:
+          condition:
+            lambda: 'return effect != "none";'
+          then:
+            - light.turn_on:
+                id: led_rgb
+                effect: !lambda 'return effect;'
+
   - id: update_led_state
     then:
       - if:
@@ -390,32 +714,95 @@ script:
             lambda: 'return id(led_mode_select).state == "Manual Control";'
           then:
             - logger.log: "Setting LED to Manual Control mode"
-            - light.turn_off: led_rgb
-      
+            - script.execute: led_fade_out
+
       - if:
           condition:
             lambda: 'return id(led_mode_select).state == "Environmental";'
           then:
             - logger.log: "Setting LED to Environmental mode"
             - script.execute: update_environmental_led
-      
+
       - if:
           condition:
             lambda: 'return id(led_mode_select).state == "Presence";'
           then:
             - logger.log: "Setting LED to Presence mode"
-            - light.turn_off: led_rgb
+            # Check current occupancy and set appropriate state
+            - if:
+                condition:
+                  lambda: 'return id(occupancy).state;'
+                then:
+                  - script.execute:
+                      id: led_fade_in
+                      brightness: 0.55
+                      red: 0.0
+                      green: 1.0
+                      blue: 0.8
+                      effect: "Presence Glow"
+                else:
+                  - script.execute: led_fade_out
 
   - id: update_environmental_led
     then:
-      - light.turn_on:
-          id: led_rgb
-          brightness: 20%
-          red: 0%
-          green: 80%
-          blue: 20%
-          white: 0%
-          effect: "Environmental Pulse"
+      # Check if CO2 sensor exists and use its data, otherwise default to good
+      - if:
+          condition:
+            lambda: 'return id(co2).state >= 1200;'
+          then:
+            # High CO2 - red with alert effect
+            - light.turn_on:
+                id: led_rgb
+                effect: none
+            - delay: 50ms
+            - light.turn_on:
+                id: led_rgb
+                brightness: !lambda 'return 0.55 * id(led_brightness_multiplier).state;'
+                red: 100%
+                green: 0%
+                blue: 0%
+                white: 0%
+                transition_length: 600ms
+            - delay: 650ms
+            - light.turn_on:
+                id: led_rgb
+                effect: "Environmental Alert"
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(co2).state >= 800;'
+                then:
+                  # Medium CO2 - amber with warning effect
+                  - light.turn_on:
+                      id: led_rgb
+                      effect: none
+                  - delay: 50ms
+                  - light.turn_on:
+                      id: led_rgb
+                      brightness: !lambda 'return 0.45 * id(led_brightness_multiplier).state;'
+                      red: 100%
+                      green: 65%
+                      blue: 0%
+                      white: 0%
+                      transition_length: 600ms
+                  - delay: 650ms
+                  - light.turn_on:
+                      id: led_rgb
+                      effect: "Environmental Warning"
+                else:
+                  # Good CO2 - steady green (no effect)
+                  - light.turn_on:
+                      id: led_rgb
+                      effect: none
+                  - delay: 50ms
+                  - light.turn_on:
+                      id: led_rgb
+                      brightness: !lambda 'return 0.35 * id(led_brightness_multiplier).state;'
+                      red: 0%
+                      green: 100%
+                      blue: 0%
+                      white: 0%
+                      transition_length: 600ms
 
 switch:
   - platform: gpio
@@ -427,6 +814,27 @@ switch:
       ignore_strapping_warning: true
 
 number:
+  - platform: template
+    name: "LED Brightness"
+    id: led_brightness_multiplier
+    icon: mdi:brightness-6
+    entity_category: config
+    min_value: 0.1
+    max_value: 1.0
+    initial_value: 1.0
+    optimistic: true
+    step: 0.05
+    restore_value: true
+    mode: slider
+    on_value:
+      then:
+        # Refresh LED state when brightness changes
+        - if:
+            condition:
+              lambda: 'return id(led_mode_select).state != "Manual Control" && id(api_connected_flag);'
+            then:
+              - script.execute: control_leds
+
   - platform: template
     name: Occupancy Timeout
     icon: mdi:clock-end
