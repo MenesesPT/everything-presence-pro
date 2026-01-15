@@ -40,5 +40,5 @@ update:
   - platform: http_request
     id: update_http_request
     name: Firmware Update
-    source: https://docs.everythingsmart.io/update/everything-presence-pro/everything-presence-pro-ethernet-co2-manifest.json
+    source: http://docs.everythingsmart.io/update/everything-presence-pro/everything-presence-pro-ethernet-co2-manifest.json
 
