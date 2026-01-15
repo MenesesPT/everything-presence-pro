@@ -6,7 +6,12 @@ esphome:
     - priority: 375
       then:
         - delay: 200ms
-        - switch.turn_on: system_alarm_relay
+        - lambda: |-
+            if (id(relay_contact_mode).state == "Normally Open (NO)") {
+              id(system_alarm_relay).turn_on();
+            } else {
+              id(system_alarm_relay).turn_off();
+            }
         # Start loading animation and keep it until API connects
         - lambda: 'id(api_connected_flag) = false;'
         - light.turn_on:
@@ -142,13 +147,15 @@ binary_sensor:
     pin:
       number: GPIO36
     filters:
-      - delayed_off:  !lambda 'return id(pir_off_delay).state * 1000.0;'
+      - delayed_off: !lambda 'return id(pir_off_delay).state * 1000.0;'
     on_state:
       then:
         - lambda: |-
             auto mode = id(system_alarm_mode).state;
             if (mode == "Motion Only" || mode == "Motion or Presence") {
-              if (id(pir_motion).state) {
+              bool activate = id(pir_motion).state;
+              bool desired = (id(relay_contact_mode).state == "Normally Open (NO)") ? activate : !activate;
+              if (desired) {
                 id(system_alarm_relay).turn_on();
               } else {
                 id(system_alarm_relay).turn_off();
@@ -176,7 +183,9 @@ binary_sensor:
         - lambda: |-
             auto mode = id(system_alarm_mode).state;
             if (mode == "Presence Only" || mode == "Motion or Presence") {
-              if (id(occupancy).state) {
+              bool activate = id(pir_motion).state;
+              bool desired = (id(relay_contact_mode).state == "Normally Open (NO)") ? activate : !activate;
+              if (desired) {
                 id(system_alarm_relay).turn_on();
               } else {
                 id(system_alarm_relay).turn_off();
@@ -287,6 +296,17 @@ light:
 
 select:
   - platform: template
+    name: Relay Contact Mode
+    id: relay_contact_mode
+    entity_category: config
+    optimistic: true
+    options:
+      - "Normally Open (NO)"
+      - "Normally Closed (NC)"
+    initial_option: "Normally Open (NO)"
+    restore_value: true
+
+  - platform: template
     name: Relay Trigger Mode
     id: system_alarm_mode
     entity_category: config
@@ -302,30 +322,22 @@ select:
       then:
         - lambda: |-
             auto mode = id(system_alarm_mode).state;
+            bool activate = false;
 
-            if (mode == "Disabled") {
+            if (mode == "Motion Only") {
+              activate = id(pir_motion).state;
+            } else if (mode == "Presence Only") {
+              activate = id(occupancy).state;
+            } else if (mode == "Motion or Presence") {
+              activate = id(pir_motion).state || id(occupancy).state;
+            }
+
+            bool desired = (id(relay_contact_mode).state == "Normally Open (NO)") ? activate : !activate;
+
+            if (desired) {
+              id(system_alarm_relay).turn_on();
+            } else {
               id(system_alarm_relay).turn_off();
-            }
-            else if (mode == "Motion Only") {
-              if (id(pir_motion).state) {
-                id(system_alarm_relay).turn_on();
-              } else {
-                id(system_alarm_relay).turn_off();
-              }
-            }
-            else if (mode == "Presence Only") {
-              if (id(occupancy).state) {
-                id(system_alarm_relay).turn_on();
-              } else {
-                id(system_alarm_relay).turn_off();
-              }
-            }
-            else if (mode == "Motion or Presence") {
-              if (id(pir_motion).state || id(occupancy).state) {
-                id(system_alarm_relay).turn_on();
-              } else {
-                id(system_alarm_relay).turn_off();
-              }
             }
 
   - platform: template
